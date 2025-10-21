@@ -1,0 +1,90 @@
+### Create user 1
+POST http://localhost:8080/users
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "email": "user1@example.com"
+}
+
+###
+
+### List all users
+GET http://localhost:8080/users
+
+###
+
+### Create user 2
+POST http://localhost:8080/users
+Content-Type: application/json
+
+{
+  "username": "user2",
+  "email": "user2@example.com"
+}
+
+###
+
+### List all users (should show two)
+GET http://localhost:8080/users
+
+###
+
+### User 1 creates poll
+POST http://localhost:8080/polls
+Content-Type: application/json
+
+{
+  "question": "Best OS?",
+  "publishedAt": "2025-10-21T12:00:00Z",
+  "validUntil": "2025-10-28T12:00:00Z",
+  "creatorId": 1,
+  "options": [
+    { "caption": "Linux", "presentationOrder": 1 },
+    { "caption": "Windows", "presentationOrder": 2 }
+  ]
+}
+
+###
+
+### List polls (see created poll)
+GET http://localhost:8080/polls
+
+###
+
+### User 2 votes on first option (Linux) with +1
+POST http://localhost:8080/votes
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "optionId": 1,
+  "value": 1
+}
+
+###
+
+### User 2 changes vote to -1
+POST http://localhost:8080/votes
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "optionId": 1,
+  "value": -1
+}
+
+###
+
+### List all votes
+GET http://localhost:8080/votes
+
+###
+
+### Delete the poll
+DELETE http://localhost:8080/polls/1
+
+###
+
+### List votes again (should be empty now)
+GET http://localhost:8080/votes
