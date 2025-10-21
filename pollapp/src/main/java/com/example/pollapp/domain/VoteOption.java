@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "voreOptions")
+@Table(name = "voteOptions")
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 public class VoteOption {
