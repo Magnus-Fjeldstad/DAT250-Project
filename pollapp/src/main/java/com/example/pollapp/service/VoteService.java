@@ -7,6 +7,7 @@ import com.example.pollapp.repo.VoteOptionRepository;
 import com.example.pollapp.repo.UserRepo;
 import com.example.pollapp.dto.VoteDto;
 import com.example.pollapp.repo.VoteRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -16,6 +17,7 @@ import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.*;
 
+@Slf4j
 @Service
 public class VoteService {
 
@@ -36,8 +38,6 @@ public class VoteService {
         this.cache = cache;
     }
 
-    /* ---------- Commands ---------- */
-
     public Optional<VoteDto> vote(VoteDto cmd) {
         validateValue(cmd.getValue());
 
@@ -49,26 +49,31 @@ public class VoteService {
 
         Long pollId = option.getPoll().getId();
 
-        // Finn eksisterende stemme for (user, option)
-        Optional<Vote> maybeExisting = voteRepository.findByVoterIdAndVotedOnId(user.getId(), option.getId());
+        Optional<Vote> maybeExisting =
+                voteRepository.findByVoterIdAndVotedOnId(user.getId(), option.getId());
 
-        // value == 0 => fjern hvis finnes
+        // Fjern eksisterende hvis value == 0
         if (cmd.getValue() == 0) {
-            maybeExisting.ifPresent(voteRepository::delete);
+            maybeExisting.ifPresent(v -> {
+                log.warn("Vote removed: user={} option={} oldValue={}", user.getId(), option.getId(), v.getValue());
+                voteRepository.delete(v);
+            });
             cache.evict(pollId);
             return Optional.empty();
         }
 
-        // Hvis finnes
+        // Hvis eksisterende
         if (maybeExisting.isPresent()) {
             Vote existing = maybeExisting.get();
             if (existing.getValue() == cmd.getValue()) {
-                // Samme verdi = toggle = fjern
+                log.warn("Vote toggled off (same value): user={} option={} value={}",
+                        user.getId(), option.getId(), existing.getValue());
                 voteRepository.delete(existing);
                 cache.evict(pollId);
                 return Optional.empty();
             } else {
-                // Endre retning
+                log.warn("Vote updated: user={} option={} oldValue={} newValue={}",
+                        user.getId(), option.getId(), existing.getValue(), cmd.getValue());
                 existing.setValue(cmd.getValue());
                 existing.setPublishedAt(Instant.now());
                 Vote saved = voteRepository.save(existing);
@@ -78,15 +83,17 @@ public class VoteService {
         }
 
         // Ny stemme
+        log.warn("Vote created: user={} option={} value={}", user.getId(), option.getId(), cmd.getValue());
         Vote v = new Vote();
         v.setVoter(user);
         v.setVotedOn(option);
         v.setValue(cmd.getValue());
         v.setPublishedAt(Instant.now());
         Vote saved = voteRepository.save(v);
-        cache.evict(pollId); // også her
+        cache.evict(pollId);
         return Optional.of(toDto(saved));
     }
+
 
     /* ---------- Queries ---------- */
 

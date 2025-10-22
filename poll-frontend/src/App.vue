@@ -28,10 +28,10 @@ function onUserSelect(id: number) {
     <UserPanel @select-user="onUserSelect" />
 
     <div v-if="!selectedPoll">
-      <CreatePoll v-if="activeUserId" @created="refreshList" />
+      <CreatePoll v-if="activeUserId" :activeUserId="activeUserId" @created="refreshList" />
       <PollList :key="Number(refreshFlag)" @select="handleSelect" />
     </div>
 
-    <PollVote v-else :poll="selectedPoll" />
+    <PollVote v-else :poll="selectedPoll" :activeUserId="activeUserId" />
   </div>
 </template>

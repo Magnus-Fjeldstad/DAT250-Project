@@ -21,7 +21,6 @@ async function loadUsers() {
 
 async function createUser() {
   if (!username.value.trim()) return;
-
   try {
     const newUser = await UserApi.create({ username: username.value });
     users.value.push(newUser);

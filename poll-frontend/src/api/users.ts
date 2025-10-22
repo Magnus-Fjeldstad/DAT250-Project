@@ -4,7 +4,6 @@ import { http } from "./http";
 export interface User {
     id?: number;
     username: string;
-    // legg til flere felter om de finnes i domenemodellen
 }
 
 export const UserApi = {
