@@ -22,28 +22,22 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final UserRepo userRepository;
     private final VoteOptionRepository voteOptionRepository;
+    private final PollResultCacheService cache;
 
-    public VoteService(VoteRepository voteRepository,
-                       UserRepo userRepository,
-                       VoteOptionRepository voteOptionRepository) {
+    public VoteService(
+            VoteRepository voteRepository,
+            UserRepo userRepository,
+            VoteOptionRepository voteOptionRepository,
+            PollResultCacheService cache
+    ) {
         this.voteRepository = voteRepository;
         this.userRepository = userRepository;
         this.voteOptionRepository = voteOptionRepository;
+        this.cache = cache;
     }
 
     /* ---------- Commands ---------- */
 
-    /**
-     * Oppretter/oppdaterer/toggler en stemme.
-     * value:
-     *   1  = oppvote
-     *  -1  = nedvote
-     *   0  = fjern (slett)
-     *
-     * Returnerer Optional<VoteDto>:
-     *   - tom Optional dersom stemmen ble fjernet (204 i controller)
-     *   - ellers VoteDto for ny/oppdatert stemme (200 i controller)
-     */
     public Optional<VoteDto> vote(VoteDto cmd) {
         validateValue(cmd.getValue());
 
@@ -53,27 +47,32 @@ public class VoteService {
         VoteOption option = voteOptionRepository.findById(require(cmd.getOptionId(), "optionId"))
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "optionId not found"));
 
+        Long pollId = option.getPoll().getId();
+
         // Finn eksisterende stemme for (user, option)
         Optional<Vote> maybeExisting = voteRepository.findByVoterIdAndVotedOnId(user.getId(), option.getId());
 
         // value == 0 => fjern hvis finnes
         if (cmd.getValue() == 0) {
             maybeExisting.ifPresent(voteRepository::delete);
+            cache.evict(pollId);
             return Optional.empty();
         }
 
-        // Hvis finnes:
+        // Hvis finnes
         if (maybeExisting.isPresent()) {
             Vote existing = maybeExisting.get();
             if (existing.getValue() == cmd.getValue()) {
-                // Samme verdi -> toggle = fjern
+                // Samme verdi = toggle = fjern
                 voteRepository.delete(existing);
+                cache.evict(pollId);
                 return Optional.empty();
             } else {
-                // Endre retning: -1 <-> 1
+                // Endre retning
                 existing.setValue(cmd.getValue());
                 existing.setPublishedAt(Instant.now());
                 Vote saved = voteRepository.save(existing);
+                cache.evict(pollId);
                 return Optional.of(toDto(saved));
             }
         }
@@ -85,6 +84,7 @@ public class VoteService {
         v.setValue(cmd.getValue());
         v.setPublishedAt(Instant.now());
         Vote saved = voteRepository.save(v);
+        cache.evict(pollId); // også her
         return Optional.of(toDto(saved));
     }
 

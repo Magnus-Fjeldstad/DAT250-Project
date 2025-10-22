@@ -7,13 +7,19 @@ Content-Type: application/json
   "email": "user1@example.com"
 }
 
-###
+> {% client.global.set("user1Id", response.body.id); %}
 
-### List all users
+###
+### List all users (should show 1)
 GET http://localhost:8080/users
 
-###
+> {%
+    if (response.body.length !== 1) {
+        throw new Error("Expected 1 user, got " + response.body.length);
+    }
+%}
 
+###
 ### Create user 2
 POST http://localhost:8080/users
 Content-Type: application/json
@@ -23,13 +29,19 @@ Content-Type: application/json
   "email": "user2@example.com"
 }
 
-###
+> {% client.global.set("user2Id", response.body.id); %}
 
-### List all users (should show two)
+###
+### List all users (should show 2)
 GET http://localhost:8080/users
 
-###
+> {%
+    if (response.body.length !== 2) {
+        throw new Error("Expected 2 users, got " + response.body.length);
+    }
+%}
 
+###
 ### User 1 creates poll
 POST http://localhost:8080/polls
 Content-Type: application/json
@@ -38,53 +50,71 @@ Content-Type: application/json
   "question": "Best OS?",
   "publishedAt": "2025-10-21T12:00:00Z",
   "validUntil": "2025-10-28T12:00:00Z",
-  "creatorId": 1,
+  "creatorId": {{user1Id}},
   "options": [
     { "caption": "Linux", "presentationOrder": 1 },
     { "caption": "Windows", "presentationOrder": 2 }
   ]
 }
 
-###
+> {%
+    client.global.set("pollId", response.body.id);
+    client.global.set("opt1Id", response.body.options[0].id);
+    client.global.set("opt2Id", response.body.options[1].id);
+%}
 
-### List polls (see created poll)
+###
+### List polls (should show one)
 GET http://localhost:8080/polls
 
-###
+> {%
+    if (response.body.length !== 1) {
+        throw new Error("Expected 1 poll, got " + response.body.length);
+    }
+%}
 
-### User 2 votes on first option (Linux) with +1
+###
+### User 2 votes +1 on Linux
 POST http://localhost:8080/votes
 Content-Type: application/json
 
 {
-  "userId": 2,
-  "optionId": 1,
+  "userId": {{user2Id}},
+  "optionId": {{opt1Id}},
   "value": 1
 }
 
 ###
-
 ### User 2 changes vote to -1
 POST http://localhost:8080/votes
 Content-Type: application/json
 
 {
-  "userId": 2,
-  "optionId": 1,
+  "userId": {{user2Id}},
+  "optionId": {{opt1Id}},
   "value": -1
 }
 
 ###
-
-### List all votes
+### List all votes (should be 1)
 GET http://localhost:8080/votes
 
-###
+> {%
+    if (response.body.length !== 1) {
+        throw new Error("Expected 1 vote, got " + response.body.length);
+    }
+%}
 
+###
 ### Delete the poll
-DELETE http://localhost:8080/polls/1
+DELETE http://localhost:8080/polls/{{pollId}}
 
 ###
-
-### List votes again (should be empty now)
+### List votes again (should be empty)
 GET http://localhost:8080/votes
+
+> {%
+    if (response.body.length !== 0) {
+        throw new Error("Votes should be empty after poll deletion");
+    }
+%}
