@@ -8,10 +8,10 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 public class VoteDto {
-    private Long id;           // null ved POST
+    private Long id;
     private Long userId;
     private Long optionId;
-    private Long pollId;       // utledes fra option → poll
-    private int value;         // 1, -1 eller 0 (0 = fjern)
+    private Long pollId;
+    private int value;
     private Instant publishedAt;
 }

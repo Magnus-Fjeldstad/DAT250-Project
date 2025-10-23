@@ -2,11 +2,13 @@ package com.example.pollapp.controller;
 
 import com.example.pollapp.domain.User;
 import com.example.pollapp.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {

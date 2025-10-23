@@ -4,15 +4,16 @@ import com.example.pollapp.domain.Poll;
 import com.example.pollapp.domain.User;
 import com.example.pollapp.domain.VoteOption;
 import com.example.pollapp.dto.PollDto;
+import com.example.pollapp.dto.PollResultDto;
 import com.example.pollapp.dto.VoteOptionDto;
 import com.example.pollapp.repo.PollRepository;
 import com.example.pollapp.repo.UserRepo;
+import com.example.pollapp.repo.VoteOptionRepository;
+import com.example.pollapp.repo.VoteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -21,10 +22,16 @@ public class PollService {
 
     private final PollRepository pollRepository;
     private final UserRepo userRepository;
+    private final PollResultCacheService cache;
+    private final VoteOptionRepository voteOptionRepository;
+    private final VoteRepository voteRepository;
 
-    public PollService(PollRepository pollRepository, UserRepo userRepository) {
+    public PollService(PollRepository pollRepository, UserRepo userRepository, PollResultCacheService cache, VoteOptionRepository voteOptionRepository, VoteRepository voteRepository) {
         this.pollRepository = pollRepository;
         this.userRepository = userRepository;
+        this.cache = cache;
+        this.voteOptionRepository = voteOptionRepository;
+        this.voteRepository = voteRepository;
     }
 
     /* ---------- Public API ---------- */
@@ -68,6 +75,38 @@ public class PollService {
             throw new ResponseStatusException(NOT_FOUND, "Poll not found");
         }
         pollRepository.deleteById(id);
+    }
+
+    public List<PollResultDto> getResults(Long pollId) {
+        var cached = cache.loadResults(pollId);
+        if (cached.isPresent()) return cached.get();
+
+        List<VoteOption> options = voteOptionRepository.findByPollIdOrderByPresentationOrderAsc(pollId);
+
+        List<Object[]> rows = voteRepository.aggregateUpDownByPoll(pollId);
+        Map<Long, int[]> countsByOpt = new HashMap<>();
+        for (Object[] r : rows) {
+            Long optionId = (Long) r[0];
+            Number up = (Number) r[1];
+            Number down = (Number) r[2];
+            countsByOpt.put(optionId, new int[]{ up == null ? 0 : up.intValue(), down == null ? 0 : down.intValue() });
+        }
+
+        List<PollResultDto> results = new ArrayList<>();
+        Map<Long, Integer> orders = new HashMap<>();
+        for (VoteOption opt : options) {
+            int[] c = countsByOpt.getOrDefault(opt.getId(), new int[]{0, 0});
+            results.add(PollResultDto.builder()
+                    .optionId(opt.getId())
+                    .caption(opt.getCaption())
+                    .upVotes(c[0])
+                    .downVotes(c[1])
+                    .build());
+            orders.put(opt.getId(), opt.getPresentationOrder());
+        }
+
+        cache.saveResults(pollId, results, orders);
+        return results;
     }
 
     /* ---------- Mapping ---------- */
@@ -116,7 +155,6 @@ public class PollService {
                     newOptions.add(opt);
                 }
             }
-            // Tøm og sett (forutsetter @OneToMany(orphanRemoval = true) i Poll)
             poll.getOptions().clear();
             poll.getOptions().addAll(newOptions);
         }
