@@ -15,5 +15,6 @@ public class PollDto {
     private Instant validUntil;
 
     private Long creatorId;
+    private String userName;
     private List<VoteOptionDto> options;
 }

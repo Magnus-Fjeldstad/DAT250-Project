@@ -1,5 +1,6 @@
 package com.example.pollapp.controller;
 import com.example.pollapp.service.PollService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 
@@ -31,12 +32,14 @@ public class PollController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @PostMapping
     public ResponseEntity<PollDto> create(@RequestBody PollDto dto) {
         PollDto created = pollService.create(dto);
         return ResponseEntity.ok(created);
     }
 
+    @PreAuthorize("@pollSecurity.isOwner(#id, authentication) or hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<PollDto> update(@PathVariable Long id, @RequestBody PollDto dto) {
         return pollService.update(id, dto)
@@ -44,6 +47,7 @@ public class PollController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("@pollSecurity.isOwner(#id, authentication) or hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         pollService.delete(id);

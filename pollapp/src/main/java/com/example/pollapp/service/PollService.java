@@ -159,4 +159,11 @@ public class PollService {
             poll.getOptions().addAll(newOptions);
         }
     }
+
+    public boolean isOwnerUsername(Long pollId, String username) {
+        return findById(pollId)
+                .map(dto -> dto.getUserName().equals(username))
+                .orElse(false);
+    }
+
 }
