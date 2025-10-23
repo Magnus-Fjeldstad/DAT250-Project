@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  pollapp:
+    build: ./pollapp
+    container_name: pollapp
+    depends_on:
+      - redis
+    environment:
+      - APP_REDIS_URL=redis://redis:6379
+    ports:
+      - "8080:8080"
+    restart: always
+
+  frontend:
+    build: ./poll-frontend
+    container_name: poll-frontend
+    depends_on:
+      - pollapp
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
