@@ -1,0 +1,12 @@
+# ignore build output
+/build
+
+# ignore OS junk files
+.DS_Store
+
+# ignore environment / secrets
+.env
+
+# ignore IDE settings
+.idea/
+.vscode/
