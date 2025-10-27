@@ -12,6 +12,12 @@ import com.example.pollapp.repo.VoteOptionRepository;
 import com.example.pollapp.repo.VoteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.*;
 
@@ -25,13 +31,21 @@ public class PollService {
     private final PollResultCacheService cache;
     private final VoteOptionRepository voteOptionRepository;
     private final VoteRepository voteRepository;
+    private final AmqpAdmin amqpAdmin;
+    private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
 
-    public PollService(PollRepository pollRepository, UserRepo userRepository, PollResultCacheService cache, VoteOptionRepository voteOptionRepository, VoteRepository voteRepository) {
+    public PollService(PollRepository pollRepository, UserRepo userRepository, PollResultCacheService cache, VoteOptionRepository voteOptionRepository, VoteRepository voteRepository, AmqpAdmin amqpAdmin,
+                   RabbitTemplate rabbitTemplate,
+                   ObjectMapper objectMapper) {
         this.pollRepository = pollRepository;
         this.userRepository = userRepository;
         this.cache = cache;
         this.voteOptionRepository = voteOptionRepository;
         this.voteRepository = voteRepository;
+        this.amqpAdmin = amqpAdmin;
+        this.rabbitTemplate = rabbitTemplate;
+        this.objectMapper = objectMapper;
     }
 
     /* ---------- Public API ---------- */
@@ -54,6 +68,11 @@ public class PollService {
         Poll poll = new Poll();
         applyDtoToEntity(dto, poll, creator, true); // true = ny poll, bygg options
         Poll saved = pollRepository.save(poll);
+        String queueName = "poll." + saved.getId();
+        String exchangeName = "poll-exchange-" + saved.getId();
+        TopicExchange exchange = new TopicExchange(exchangeName, true, false);
+        amqpAdmin.declareExchange(exchange);
+        // Legg til optional eventuelt
         return toDto(saved);
     }
 

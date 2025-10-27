@@ -13,6 +13,7 @@ services:
     container_name: pollapp
     depends_on:
       - redis
+      - rabbitmq
     environment:
       - APP_REDIS_URL=redis://redis:6379
     ports:
@@ -27,3 +28,14 @@ services:
     ports:
       - "5173:5173"
     restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
