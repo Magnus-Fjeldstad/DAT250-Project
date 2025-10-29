@@ -1,49 +1,28 @@
-// src/api/http.ts
-const BASE_URL = "http://localhost:8080"; // endre ved behov
+// HTTP helper that includes credentials so JSESSIONID is sent/received
+const BASE_URL = "http://localhost:8080"; // adjust if needed
 
 async function request(path: string, options: RequestInit = {}) {
-    console.log("[HTTP] →", path, options);
-
     const response = await fetch(BASE_URL + path, {
-        headers: {
-            "Content-Type": "application/json",
-        },
+        credentials: "include", // critical for session cookies
+        headers: { "Content-Type": "application/json" },
         ...options,
     });
 
     let body: any = null;
-    try {
-        // prøv å parse json, hvis ikke: ren tekst
-        const text = await response.text();
-        try {
-            body = JSON.parse(text);
-        } catch {
-            body = text;
-        }
-    } catch {
-        body = null;
-    }
-
-    console.log("[HTTP] ←", response.status, body);
+    const txt = await response.text();
+    try { body = txt ? JSON.parse(txt) : null; } catch { body = txt || null; }
 
     if (!response.ok && response.status !== 204) {
-        throw new Error(`HTTP error: ${response.status} - ${JSON.stringify(body)}`);
+        throw new Error(`HTTP ${response.status}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
     }
-
-    return body;
+    return body as any;
 }
 
-
 export const http = {
-    get: <T>(path: string): Promise<T> =>
-        request(path, { method: "GET" }),
-
+    get: <T>(path: string): Promise<T> => request(path, { method: "GET" }),
     post: <T>(path: string, body: any): Promise<T> =>
         request(path, { method: "POST", body: JSON.stringify(body) }),
-
-    put: <T>(path: string, body: any): Promise<T> =>
+    put:  <T>(path: string, body: any): Promise<T> =>
         request(path, { method: "PUT", body: JSON.stringify(body) }),
-
-    delete: (path: string): Promise<void> =>
-        request(path, { method: "DELETE" }),
+    delete: (path: string): Promise<void> => request(path, { method: "DELETE" }),
 };

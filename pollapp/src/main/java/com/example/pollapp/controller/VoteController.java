@@ -23,7 +23,7 @@ public class VoteController {
     public ResponseEntity<?> vote(@RequestBody VoteDto cmd) {
         return voteService.vote(cmd)
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.noContent().build()); // 204 når stemme fjernes
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /* Queries */
