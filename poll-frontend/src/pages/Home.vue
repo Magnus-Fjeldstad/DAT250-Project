@@ -1,9 +1,8 @@
-<!-- src/pages/Home.vue -->
 <script setup>
-// checks session guard via router; offers logout
-import api from "../api";
+import api from "../api/api.js";
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import PollList from "../Components/PollList.vue";
 
 const router = useRouter();
 const user = ref(null);
@@ -23,8 +22,24 @@ const logout = async () => {
   <div class="p-6">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-lg font-semibold">Welcome {{ user?.username }}</h2>
-      <button @click="logout" class="px-3 py-1 bg-gray-800 text-white">Logout</button>
+
+      <div class="flex gap-2">
+        <button
+            @click="router.push('/create-poll')"
+            class="px-3 py-1 bg-blue-600 text-white"
+        >
+          New Poll
+        </button>
+
+        <button
+            @click="logout"
+            class="px-3 py-1 bg-gray-800 text-white"
+        >
+          Logout
+        </button>
+      </div>
     </div>
-    <p>Authenticated content here</p>
+
+    <PollList />
   </div>
 </template>

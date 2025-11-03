@@ -23,4 +23,15 @@ export const fetchCurrentUser = () =>
 export const logoutUser = () =>
     api.post("/auth/logout");
 
+export const createPoll = (question, options) =>
+    api.post("/polls", {
+        question,
+        options: options.map(o => ({ text: o }))
+    });
+
+// fetch all polls
+export const getPolls = () =>
+    api.get("/polls");
+
+
 export default api;
