@@ -2,12 +2,16 @@
 FROM node:20-slim AS frontend-builder
 WORKDIR /frontend
 
-# Copy npm metadata & install dependencies
+# Copy npm metadata
 COPY poll-frontend/package*.json ./
-RUN npm install
 
-# Copy full frontend source and build
-COPY poll-frontend .
+# Install all dependencies cleanly (always fresh & deterministic)
+RUN npm ci
+
+# Copy full frontend source
+COPY poll-frontend/ .
+
+# Build frontend
 RUN npm run build
 
 
@@ -15,26 +19,28 @@ RUN npm run build
 FROM gradle:8.10.2-jdk21 AS backend-builder
 WORKDIR /app
 
-# Copy gradle metadata first (cache)
+# Copy gradle metadata first for caching
 COPY pollapp/settings.gradle pollapp/build.gradle /app/pollapp/
 COPY pollapp/gradle /app/pollapp/gradle
 
 WORKDIR /app/pollapp
+
+# Download gradle dependencies without source code
 RUN gradle build -x test || true
 
-# Copy full backend
+# Now copy the actual backend source
 COPY pollapp /app/pollapp
 
-# Ensure static resources folder exists
+# Ensure Spring static folder exists
 RUN mkdir -p /app/pollapp/src/main/resources/static
 
-# Copy vite public/ (vite.svg etc) into static BEFORE dist
+# Copy Vite public/ static files
 COPY poll-frontend/public/ /app/pollapp/src/main/resources/static/
 
-# Copy dist contents into static (not the folder itself)
+# Copy built frontend into static folder
 COPY --from=frontend-builder /frontend/dist/ /app/pollapp/src/main/resources/static/
 
-# Build the jar
+# Build the executable jar
 RUN gradle bootJar -x test
 
 

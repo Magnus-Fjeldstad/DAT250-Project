@@ -7,6 +7,7 @@ import com.example.pollapp.dto.VoteDto;
 import com.example.pollapp.repo.VoteOptionRepository;
 import com.example.pollapp.repo.VoteRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -24,17 +25,21 @@ public class VoteService {
     private final VoteOptionRepository voteOptionRepository;
     private final PollResultCacheService cache;
     private final AuthService authService;
-    
+
+    private final SimpMessagingTemplate messagingTemplate;
+
     public VoteService(
             VoteRepository voteRepository,
             VoteOptionRepository voteOptionRepository,
             PollResultCacheService cache,
-            AuthService authService
+            AuthService authService,
+            SimpMessagingTemplate messagingTemplate
     ) {
         this.voteRepository = voteRepository;
         this.voteOptionRepository = voteOptionRepository;
         this.cache = cache;
         this.authService = authService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public Optional<VoteDto> vote(VoteDto cmd) {
@@ -54,38 +59,35 @@ public class VoteService {
         Optional<Vote> maybeExisting =
                 voteRepository.findByVoterIdAndVotedOnId(user.getId(), option.getId());
 
-        // Remove if 0
+        // Remove vote (value = 0)
         if (cmd.getValue() == 0) {
             maybeExisting.ifPresent(v -> {
-                log.info("Vote removed: user={} option={} oldValue={}", user.getId(), option.getId(), v.getValue());
                 voteRepository.delete(v);
+                cache.evict(pollId);
+                broadcastPollUpdate(pollId);
             });
-            cache.evict(pollId);
             return Optional.empty();
         }
 
-        // Toggle/update logic
+        // Update existing
         if (maybeExisting.isPresent()) {
             Vote existing = maybeExisting.get();
             if (existing.getValue() == cmd.getValue()) {
-                // Toggle off
-                log.info("Vote toggled off: user={} option={} value={}", user.getId(), option.getId(), existing.getValue());
                 voteRepository.delete(existing);
                 cache.evict(pollId);
+                broadcastPollUpdate(pollId);
                 return Optional.empty();
             } else {
-                // Update
-                log.info("Vote updated: user={} option={} old={} new={}", user.getId(), option.getId(), existing.getValue(), cmd.getValue());
                 existing.setValue(cmd.getValue());
                 existing.setPublishedAt(Instant.now());
                 Vote saved = voteRepository.save(existing);
                 cache.evict(pollId);
+                broadcastPollUpdate(pollId);
                 return Optional.of(toDto(saved));
             }
         }
 
         // New vote
-        log.info("Vote created: user={} option={} value={}", user.getId(), option.getId(), cmd.getValue());
         Vote v = new Vote();
         v.setVoter(user);
         v.setVotedOn(option);
@@ -94,7 +96,9 @@ public class VoteService {
         Vote saved = voteRepository.save(v);
 
         cache.evict(pollId);
+        broadcastPollUpdate(pollId);
         return Optional.of(toDto(saved));
+
     }
 
     /* ---------- Queries ---------- */
@@ -136,5 +140,14 @@ public class VoteService {
                 .value(v.getValue())
                 .publishedAt(v.getPublishedAt())
                 .build();
+    }
+
+    private void broadcastPollUpdate(Long pollId) {
+        var votes = voteRepository.findAllByVotedOn_Poll_Id(pollId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+
+        messagingTemplate.convertAndSend("/topic/poll/" + pollId, votes);
     }
 }
