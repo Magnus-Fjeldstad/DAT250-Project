@@ -17,66 +17,101 @@ import java.util.*;
 
 import static org.springframework.http.HttpStatus.*;
 
+// PollService with role-aware rules:
+// - GUEST: can only GET (enforced by SecurityConfig)
+// - USER: can create, and update/delete ONLY own polls
+// - ADMIN: can create/update/delete ANY poll
 @Service
 public class PollService {
 
     private final PollRepository pollRepository;
-    private final UserRepo userRepository;
     private final PollResultCacheService cache;
     private final VoteOptionRepository voteOptionRepository;
     private final VoteRepository voteRepository;
 
-    public PollService(PollRepository pollRepository, UserRepo userRepository, PollResultCacheService cache, VoteOptionRepository voteOptionRepository, VoteRepository voteRepository) {
+    // Provides current session user and role checks
+    private final AuthService authService;
+
+    public PollService(PollRepository pollRepository,
+                       PollResultCacheService cache,
+                       VoteOptionRepository voteOptionRepository,
+                       VoteRepository voteRepository,
+                       AuthService authService) {
         this.pollRepository = pollRepository;
-        this.userRepository = userRepository;
         this.cache = cache;
         this.voteOptionRepository = voteOptionRepository;
         this.voteRepository = voteRepository;
+        this.authService = authService;
     }
 
-    /* ---------- Public API ---------- */
+    /* ---------- Public API (read) ---------- */
 
+    // Everyone (including GUEST) can list polls (permitted in SecurityConfig)
     public List<PollDto> findAll() {
         return pollRepository.findAll().stream().map(this::toDto).toList();
     }
 
+    // Everyone can read a specific poll (permitted in SecurityConfig)
     public Optional<PollDto> findById(Long id) {
         return pollRepository.findById(id).map(this::toDto);
     }
 
-    public PollDto create(PollDto dto) {
-        if (dto.getCreatorId() == null) {
-            throw new ResponseStatusException(BAD_REQUEST, "creatorId is required");
-        }
-        User creator = userRepository.findById(dto.getCreatorId())
-                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "creatorId not found"));
+    /* ---------- Public API (write) ---------- */
 
+    // CREATE: creator must be the current session user (ignore dto.creatorId for security)
+    public PollDto create(PollDto dto) {
+        User creator = authService.getCurrentUser(); // session user
+
+        // Build a new entity owned by the current user
         Poll poll = new Poll();
-        applyDtoToEntity(dto, poll, creator, true); // true = ny poll, bygg options
+        applyDtoToEntity(dto, poll, creator, true); // true = new poll, build options
         Poll saved = pollRepository.save(poll);
         return toDto(saved);
     }
 
+    // UPDATE: ADMIN can update any poll; USER only own polls. Creator cannot be reassigned by client.
     public Optional<PollDto> update(Long id, PollDto dto) {
+        User current = authService.getCurrentUser();
+
         return pollRepository.findById(id).map(existing -> {
             User creator = existing.getCreator();
-            if (dto.getCreatorId() != null && (creator == null || !dto.getCreatorId().equals(creator.getId()))) {
-                creator = userRepository.findById(dto.getCreatorId())
-                        .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "creatorId not found"));
+
+            // Enforce ownership or ADMIN privilege
+            if (!authService.isAdmin(current)) {
+                if (creator == null || !creator.getId().equals(current.getId())) {
+                    throw new ResponseStatusException(FORBIDDEN, "You cannot edit this poll");
+                }
             }
-            applyDtoToEntity(dto, existing, creator, false); // false = oppdater, erstatt options om gitt
+
+            // Do not allow changing creator via DTO
+            if (dto.getCreatorId() != null && !Objects.equals(dto.getCreatorId(), creator != null ? creator.getId() : null)) {
+                throw new ResponseStatusException(FORBIDDEN, "Creator cannot be changed");
+            }
+
+            applyDtoToEntity(dto, existing, creator, false); // false = update; replace options if provided
             Poll saved = pollRepository.save(existing);
             return toDto(saved);
         });
     }
 
+    // DELETE: ADMIN can delete any poll; USER only own polls
     public void delete(Long id) {
-        if (!pollRepository.existsById(id)) {
-            throw new ResponseStatusException(NOT_FOUND, "Poll not found");
+        User current = authService.getCurrentUser();
+
+        Poll poll = pollRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Poll not found"));
+
+        if (!authService.isAdmin(current)) {
+            User creator = poll.getCreator();
+            if (creator == null || !creator.getId().equals(current.getId())) {
+                throw new ResponseStatusException(FORBIDDEN, "You cannot delete this poll");
+            }
         }
-        pollRepository.deleteById(id);
+
+        pollRepository.delete(poll);
     }
 
+    // Results are readable by everyone (GUEST allowed)
     public List<PollResultDto> getResults(Long pollId) {
         var cached = cache.loadResults(pollId);
         if (cached.isPresent()) return cached.get();
@@ -89,7 +124,10 @@ public class PollService {
             Long optionId = (Long) r[0];
             Number up = (Number) r[1];
             Number down = (Number) r[2];
-            countsByOpt.put(optionId, new int[]{ up == null ? 0 : up.intValue(), down == null ? 0 : down.intValue() });
+            countsByOpt.put(optionId, new int[]{
+                    up == null ? 0 : up.intValue(),
+                    down == null ? 0 : down.intValue()
+            });
         }
 
         List<PollResultDto> results = new ArrayList<>();
@@ -109,8 +147,9 @@ public class PollService {
         return results;
     }
 
-    /* ---------- Mapping ---------- */
+    /* ---------- Mapping helpers ---------- */
 
+    // Map entity -> DTO
     private PollDto toDto(Poll poll) {
         return PollDto.builder()
                 .id(poll.getId())
@@ -130,27 +169,35 @@ public class PollService {
     }
 
     /**
-     * Kopierer felter/opsjoner fra DTO til entity.
-     * Hvis isCreate = true, bygges en helt ny options-liste.
-     * Hvis isCreate = false:
-     *   - hvis dto.options != null, erstattes hele options-listen (orphanRemoval på Poll sørger for opprydding)
-     *   - hvis dto.options == null, behold eksisterende options uendret
+     * Copies fields/options from DTO into entity.
+     * If isCreate = true, builds a new options list.
+     * If isCreate = false:
+     *   - if dto.options != null, replace entire options list (orphanRemoval handles cleanup)
+     *   - if dto.options == null, keep existing options unchanged
+     *
+     * @param dto incoming DTO
+     * @param poll target entity to mutate
+     * @param creator enforced creator (never taken from client)
+     * @param isCreate true for new polls, false for update
      */
     private void applyDtoToEntity(PollDto dto, Poll poll, User creator, boolean isCreate) {
         if (dto.getQuestion() != null) poll.setQuestion(dto.getQuestion());
         if (dto.getPublishedAt() != null) poll.setPublishedAt(dto.getPublishedAt());
         if (dto.getValidUntil() != null) poll.setValidUntil(dto.getValidUntil());
-        poll.setCreator(creator);
+        poll.setCreator(creator); // enforce server-side creator
 
         if (isCreate || dto.getOptions() != null) {
-            // Erstatt hele options-listen basert på DTO
+            // Rebuild options from DTO (or leave as-is on update when null)
             List<VoteOption> newOptions = new ArrayList<>();
             if (dto.getOptions() != null) {
                 for (VoteOptionDto o : dto.getOptions()) {
                     VoteOption opt = new VoteOption();
-                    opt.setId(o.getId()); // ignorert ved insert (auto gen), men ok ved ev. merge
+                    // id is ignored on insert; can be respected by JPA on merge/update
+                    opt.setId(o.getId());
                     opt.setCaption(o.getCaption());
-                    opt.setPresentationOrder(o.getPresentationOrder() == null ? 0 : o.getPresentationOrder());
+                    opt.setPresentationOrder(
+                            o.getPresentationOrder() == null ? 0 : o.getPresentationOrder()
+                    );
                     opt.setPoll(poll); // backref
                     newOptions.add(opt);
                 }

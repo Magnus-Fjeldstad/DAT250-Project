@@ -7,6 +7,7 @@ import com.example.pollapp.dto.RegisterRequestDto;
 import com.example.pollapp.mapper.UserMapper;
 import com.example.pollapp.security.CustomUserDetails;
 import com.example.pollapp.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,6 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 
 
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
@@ -48,19 +50,17 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
 
-        if (authentication.isAuthenticated()) {
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            httpRequest.getSession(true);
+        // Important: create session BEFORE setting authentication
+        httpRequest.getSession(true);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
-            User loggedInUser = principal.user(); // extract domain user
-            loggedInUser.setPassword(null);
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+        User loggedInUser = principal.user();
+        loggedInUser.setPassword(null);
 
-            return ResponseEntity.ok(loggedInUser);
-        }
-
-        return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(loggedInUser);
     }
+
 
     @GetMapping("/me")
     public ResponseEntity<User> me() {

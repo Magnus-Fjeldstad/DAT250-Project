@@ -3,9 +3,8 @@ package com.example.pollapp.service;
 import com.example.pollapp.domain.User;
 import com.example.pollapp.domain.Vote;
 import com.example.pollapp.domain.VoteOption;
-import com.example.pollapp.repo.VoteOptionRepository;
-import com.example.pollapp.repo.UserRepo;
 import com.example.pollapp.dto.VoteDto;
+import com.example.pollapp.repo.VoteOptionRepository;
 import com.example.pollapp.repo.VoteRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,58 +21,61 @@ import static org.springframework.http.HttpStatus.*;
 public class VoteService {
 
     private final VoteRepository voteRepository;
-    private final UserRepo userRepository;
     private final VoteOptionRepository voteOptionRepository;
     private final PollResultCacheService cache;
+    private final AuthService authService;
 
     public VoteService(
             VoteRepository voteRepository,
-            UserRepo userRepository,
             VoteOptionRepository voteOptionRepository,
-            PollResultCacheService cache
+            PollResultCacheService cache,
+            AuthService authService
     ) {
         this.voteRepository = voteRepository;
-        this.userRepository = userRepository;
         this.voteOptionRepository = voteOptionRepository;
         this.cache = cache;
+        this.authService = authService;
     }
 
     public Optional<VoteDto> vote(VoteDto cmd) {
+        // Must be logged in
+        User user = authService.getCurrentUser();
+
         validateValue(cmd.getValue());
 
-        User user = userRepository.findById(require(cmd.getUserId(), "userId"))
-                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "userId not found"));
-
-        VoteOption option = voteOptionRepository.findById(require(cmd.getOptionId(), "optionId"))
+        // Lookup option
+        Long optionId = require(cmd.getOptionId(), "optionId");
+        VoteOption option = voteOptionRepository.findById(optionId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "optionId not found"));
 
         Long pollId = option.getPoll().getId();
 
+        // Existing?
         Optional<Vote> maybeExisting =
                 voteRepository.findByVoterIdAndVotedOnId(user.getId(), option.getId());
 
-        // Fjern eksisterende hvis value == 0
+        // Remove if 0
         if (cmd.getValue() == 0) {
             maybeExisting.ifPresent(v -> {
-                log.warn("Vote removed: user={} option={} oldValue={}", user.getId(), option.getId(), v.getValue());
+                log.info("Vote removed: user={} option={} oldValue={}", user.getId(), option.getId(), v.getValue());
                 voteRepository.delete(v);
             });
             cache.evict(pollId);
             return Optional.empty();
         }
 
-        // Hvis eksisterende
+        // Toggle/update logic
         if (maybeExisting.isPresent()) {
             Vote existing = maybeExisting.get();
             if (existing.getValue() == cmd.getValue()) {
-                log.warn("Vote toggled off (same value): user={} option={} value={}",
-                        user.getId(), option.getId(), existing.getValue());
+                // Toggle off
+                log.info("Vote toggled off: user={} option={} value={}", user.getId(), option.getId(), existing.getValue());
                 voteRepository.delete(existing);
                 cache.evict(pollId);
                 return Optional.empty();
             } else {
-                log.warn("Vote updated: user={} option={} oldValue={} newValue={}",
-                        user.getId(), option.getId(), existing.getValue(), cmd.getValue());
+                // Update
+                log.info("Vote updated: user={} option={} old={} new={}", user.getId(), option.getId(), existing.getValue(), cmd.getValue());
                 existing.setValue(cmd.getValue());
                 existing.setPublishedAt(Instant.now());
                 Vote saved = voteRepository.save(existing);
@@ -82,18 +84,18 @@ public class VoteService {
             }
         }
 
-        // Ny stemme
-        log.warn("Vote created: user={} option={} value={}", user.getId(), option.getId(), cmd.getValue());
+        // New vote
+        log.info("Vote created: user={} option={} value={}", user.getId(), option.getId(), cmd.getValue());
         Vote v = new Vote();
         v.setVoter(user);
         v.setVotedOn(option);
         v.setValue(cmd.getValue());
         v.setPublishedAt(Instant.now());
         Vote saved = voteRepository.save(v);
+
         cache.evict(pollId);
         return Optional.of(toDto(saved));
     }
-
 
     /* ---------- Queries ---------- */
 

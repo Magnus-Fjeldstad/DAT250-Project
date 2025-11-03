@@ -9,7 +9,8 @@ services:
     restart: always
 
   pollapp:
-    build: ./pollapp
+    build:
+      context: .
     container_name: pollapp
     depends_on:
       - redis
@@ -18,12 +19,3 @@ services:
     ports:
       - "8080:8080"
     restart: always
-
-  frontend:
-    build: ./poll-frontend
-    container_name: poll-frontend
-    depends_on:
-      - pollapp
-    ports:
-      - "5173:5173"
-    restart: unless-stopped
