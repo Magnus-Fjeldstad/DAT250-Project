@@ -10,16 +10,23 @@ import com.example.pollapp.repo.PollRepository;
 import com.example.pollapp.repo.UserRepo;
 import com.example.pollapp.repo.VoteOptionRepository;
 import com.example.pollapp.repo.VoteRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.amqp.core.AmqpAdmin;
 
-import java.util.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.ArrayList;
+
 
 import static org.springframework.http.HttpStatus.*;
 
@@ -62,17 +69,33 @@ public class PollService {
         if (dto.getCreatorId() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "creatorId is required");
         }
+
         User creator = userRepository.findById(dto.getCreatorId())
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "creatorId not found"));
 
         Poll poll = new Poll();
         applyDtoToEntity(dto, poll, creator, true); // true = ny poll, bygg options
         Poll saved = pollRepository.save(poll);
-        String queueName = "poll." + saved.getId();
-        String exchangeName = "poll-exchange-" + saved.getId();
+
+        String queueName = "poll." + saved.getId(); // Eksempel: poll.123
+        String exchangeName = "poll-exchange";
+
+        Queue queue = new Queue(queueName, true);
         TopicExchange exchange = new TopicExchange(exchangeName, true, false);
+        Binding binding = BindingBuilder.bind(queue).to(exchange).with("poll.created");
+
+        amqpAdmin.declareQueue(queue);
         amqpAdmin.declareExchange(exchange);
-        // Legg til optional eventuelt
+        amqpAdmin.declareBinding(binding);
+
+        try {
+            String messageJson = objectMapper.writeValueAsString(toDto(saved));
+            rabbitTemplate.convertAndSend(exchangeName, "poll.created", messageJson);
+            System.out.println("[RabbitMQ] Poll sendt: " + messageJson);
+        } catch (Exception e) {
+            System.err.println("[RabbitMQ] Feil ved sending av poll-melding: " + e.getMessage());
+        }  
+
         return toDto(saved);
     }
 
