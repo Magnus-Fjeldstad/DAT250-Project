@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Entity
 @Table(name = "voteOptions")
@@ -14,7 +15,7 @@ import java.util.List;
 public class VoteOption {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // database generates safe unique id
     private Long id;
 
     private String caption;

@@ -14,7 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import static org.springframework.http.HttpStatus.*;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Slf4j
 @Service
@@ -24,7 +24,7 @@ public class VoteService {
     private final VoteOptionRepository voteOptionRepository;
     private final PollResultCacheService cache;
     private final AuthService authService;
-
+    
     public VoteService(
             VoteRepository voteRepository,
             VoteOptionRepository voteOptionRepository,

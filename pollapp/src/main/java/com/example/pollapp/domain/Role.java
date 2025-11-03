@@ -1,7 +1,8 @@
 package com.example.pollapp.domain;
 
 public enum Role {
-    USER,
-    ADMIN,
-    GUEST
+    ROLE_USER,
+    ROLE_ADMIN,
+    ROLE_GUEST
 }
+

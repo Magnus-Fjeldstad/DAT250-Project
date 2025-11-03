@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Entity
 @Table(name = "votes")
@@ -12,7 +13,7 @@ import java.time.Instant;
 public class Vote {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // database generates safe unique id
     private Long id;
 
     private Instant publishedAt;

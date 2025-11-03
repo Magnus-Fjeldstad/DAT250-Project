@@ -14,7 +14,7 @@ public class UserMapper {
         user.setUsername(dto.username());
         user.setEmail(dto.email());
         user.setPassword(dto.password());
-        user.setRole(Role.USER); // default user role
+        user.setRole(Role.ROLE_USER);
         return user;
     }
 }

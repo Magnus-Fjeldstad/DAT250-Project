@@ -21,7 +21,7 @@ public class AuthService {
     }
 
     public boolean isAdmin(User user) {
-        return user.getRole() == Role.ADMIN;
+        return user.getRole() == Role.ROLE_ADMIN;
     }
 }
 
