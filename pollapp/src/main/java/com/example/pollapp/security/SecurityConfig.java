@@ -3,13 +3,15 @@ package com.example.pollapp.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.*;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -17,29 +19,22 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    // Main Spring Security filter chain
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-                // CORS not needed since frontend is served from the same origin (8080)
-                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults()) // CORS handled by CorsConfig class
+                .csrf(csrf -> csrf.disable()) // disable CSRF for API usage
                 .authorizeHttpRequests(auth -> auth
-                        // allow SPA files
                         .requestMatchers("/", "/index.html", "/favicon.ico", "/vite.svg").permitAll()
                         .requestMatchers("/assets/**").permitAll()
                         .requestMatchers("/*.js", "/*.css").permitAll()
-
-                        // auth endpoints free
                         .requestMatchers("/auth/**").permitAll()
-
-                        // public reads
                         .requestMatchers(HttpMethod.GET, "/votes/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/polls/**").permitAll()
-
-                        // requires session auth
                         .requestMatchers(HttpMethod.POST, "/votes").authenticated()
                         .requestMatchers(HttpMethod.POST, "/polls").authenticated()
-
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
@@ -52,11 +47,13 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // Password hashing for user accounts
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    // Authentication manager using your custom user service
     @Bean
     public AuthenticationManager authenticationManager(
             CustomUserDetailsService userDetailsService,
