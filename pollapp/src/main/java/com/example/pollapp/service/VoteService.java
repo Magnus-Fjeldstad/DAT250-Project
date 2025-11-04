@@ -4,9 +4,9 @@ import com.example.pollapp.domain.User;
 import com.example.pollapp.domain.Vote;
 import com.example.pollapp.domain.VoteOption;
 import com.example.pollapp.dto.VoteDto;
+import com.example.pollapp.mapper.VoteMapper;
 import com.example.pollapp.repo.VoteOptionRepository;
 import com.example.pollapp.repo.VoteRepository;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,6 @@ import java.util.Optional;
 import static com.example.pollapp.config.RabbitConfig.VOTE_QUEUE;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
-@Slf4j
 @Service
 public class VoteService {
 
@@ -29,6 +28,7 @@ public class VoteService {
     private final AuthService authService;
     private final SimpMessagingTemplate messagingTemplate;
     private final RabbitTemplate rabbitTemplate; // Rabbit producer
+    private final VoteMapper voteMapper;
 
     public VoteService(
             VoteRepository voteRepository,
@@ -36,7 +36,8 @@ public class VoteService {
             PollResultCacheService cache,
             AuthService authService,
             SimpMessagingTemplate messagingTemplate,
-            RabbitTemplate rabbitTemplate // inject RabbitTemplate
+            RabbitTemplate rabbitTemplate,
+            VoteMapper voteMapper
     ) {
         this.voteRepository = voteRepository;
         this.voteOptionRepository = voteOptionRepository;
@@ -44,6 +45,7 @@ public class VoteService {
         this.authService = authService;
         this.messagingTemplate = messagingTemplate;
         this.rabbitTemplate = rabbitTemplate;
+        this.voteMapper = voteMapper;
     }
 
     public Optional<VoteDto> vote(VoteDto cmd) {
@@ -53,7 +55,7 @@ public class VoteService {
         validateValue(cmd.getValue());
 
         // Lookup option
-        Long optionId = require(cmd.getOptionId(), "optionId");
+        Long optionId = require(cmd.getOptionId());
         VoteOption option = voteOptionRepository.findById(optionId)
                 .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "optionId not found"));
 
@@ -85,14 +87,7 @@ public class VoteService {
                 sendVoteEvent(cmd); // publish delete event
                 return Optional.empty();
             } else {
-                existing.setValue(cmd.getValue());
-                existing.setPublishedAt(Instant.now());
-                Vote saved = voteRepository.save(existing);
-                cache.evict(pollId);
-                broadcastPollUpdate(pollId);
-                VoteDto dto = toDto(saved);
-                sendVoteEvent(dto); // publish update event
-                return Optional.of(dto);
+                return getVoteDto(cmd, pollId, existing);
             }
         }
 
@@ -100,30 +95,23 @@ public class VoteService {
         Vote v = new Vote();
         v.setVoter(user);
         v.setVotedOn(option);
-        v.setValue(cmd.getValue());
-        v.setPublishedAt(Instant.now());
-        Vote saved = voteRepository.save(v);
-
-        cache.evict(pollId);
-        broadcastPollUpdate(pollId);
-
-        VoteDto dto = toDto(saved);
-        sendVoteEvent(dto); // publish create event
-        return Optional.of(dto);
+        return getVoteDto(cmd, pollId, v);
     }
+
+
 
     /* ---------- Queries ---------- */
 
     public List<VoteDto> findAll() {
-        return voteRepository.findAll().stream().map(this::toDto).toList();
+        return voteRepository.findAll().stream().map(voteMapper::toDto).toList();
     }
 
     public List<VoteDto> findByUserId(Long userId) {
-        return voteRepository.findAllByVoterId(userId).stream().map(this::toDto).toList();
+        return voteRepository.findAllByVoterId(userId).stream().map(voteMapper::toDto).toList();
     }
 
     public List<VoteDto> findByPollId(Long pollId) {
-        return voteRepository.findAllByVotedOn_Poll_Id(pollId).stream().map(this::toDto).toList();
+        return voteRepository.findAllByVotedOn_Poll_Id(pollId).stream().map(voteMapper::toDto).toList();
     }
 
     /* ---------- Helpers ---------- */
@@ -138,32 +126,32 @@ public class VoteService {
     }
 
 
-    private Long require(Long v, String name) {
-        if (v == null) throw new ResponseStatusException(BAD_REQUEST, name + " is required");
+    private Long require(Long v) {
+        if (v == null) throw new ResponseStatusException(BAD_REQUEST, "optionId" + " is required");
         return v;
     }
 
-    private VoteDto toDto(Vote v) {
-        Long pollId = (v.getVotedOn() != null && v.getVotedOn().getPoll() != null)
-                ? v.getVotedOn().getPoll().getId() : null;
-
-        return VoteDto.builder()
-                .id(v.getId())
-                .userId(v.getVoter() != null ? v.getVoter().getId() : null)
-                .optionId(v.getVotedOn() != null ? v.getVotedOn().getId() : null)
-                .pollId(pollId)
-                .value(v.getValue())
-                .publishedAt(v.getPublishedAt())
-                .build();
-    }
 
     private void broadcastPollUpdate(Long pollId) {
         var votes = voteRepository.findAllByVotedOn_Poll_Id(pollId)
                 .stream()
-                .map(this::toDto)
+                .map(voteMapper::toDto)
                 .toList();
 
         messagingTemplate.convertAndSend("/topic/poll/" + pollId, votes);
+    }
+
+    private Optional<VoteDto> getVoteDto(VoteDto cmd, Long pollId, Vote v) {
+        v.setValue(cmd.getValue());
+        v.setPublishedAt(Instant.now());
+        Vote saved = voteRepository.save(v);
+
+        cache.evict(pollId);
+        broadcastPollUpdate(pollId);
+
+        VoteDto dto = voteMapper.toDto(saved);
+        sendVoteEvent(dto);
+        return Optional.of(dto);
     }
 
     /* ---------- RabbitMQ publish ---------- */

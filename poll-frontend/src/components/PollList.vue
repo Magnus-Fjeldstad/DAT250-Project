@@ -1,23 +1,47 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { getPolls } from "../api/api.js";
 import PollVote from "./PollVote.vue";
 
-const polls = ref([]);
+// If parent passes polls, use them
+const props = defineProps({
+  polls: { type: Array, default: null }
+});
+
+const localPolls = ref([]);
 const loading = ref(true);
 const error = ref("");
 const expandedPollId = ref(null);
 
-onMounted(async () => {
+// Fetch only if parent did not provide polls
+const loadPollsIfNeeded = async () => {
+  if (props.polls !== null) {
+    localPolls.value = props.polls;
+    loading.value = false;
+    return;
+  }
+
   try {
     const res = await getPolls();
-    polls.value = res.data;
+    localPolls.value = res.data;
   } catch {
     error.value = "Failed to load polls";
   } finally {
     loading.value = false;
   }
-});
+};
+
+// If parent updates polls, sync
+watch(
+    () => props.polls,
+    (newVal) => {
+      if (newVal !== null) {
+        localPolls.value = newVal;
+      }
+    }
+);
+
+onMounted(loadPollsIfNeeded);
 
 const togglePoll = (id) => {
   expandedPollId.value = expandedPollId.value === id ? null : id;
@@ -26,17 +50,15 @@ const togglePoll = (id) => {
 
 <template>
   <div class="space-y-4">
-
     <div v-if="loading" class="text-gray-500">Loading polls...</div>
     <div v-if="error" class="text-red-600 text-sm">{{ error }}</div>
 
     <ul class="space-y-3">
       <li
-          v-for="poll in polls"
+          v-for="poll in localPolls"
           :key="poll.id"
           class="rounded-lg border bg-white shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden"
       >
-        <!-- Poll Header -->
         <div
             class="flex justify-between items-center px-4 py-3 hover:bg-gray-50 transition"
             @click="togglePoll(poll.id)"
@@ -45,9 +67,7 @@ const togglePoll = (id) => {
             <div class="font-semibold text-gray-800 text-sm sm:text-base">
               {{ poll.question }}
             </div>
-            <div class="text-xs text-gray-500 mt-0.5">
-              ID: {{ poll.id }}
-            </div>
+            <div class="text-xs text-gray-500 mt-0.5">ID: {{ poll.id }}</div>
           </div>
 
           <svg
@@ -60,12 +80,10 @@ const togglePoll = (id) => {
               stroke="currentColor"
               stroke-width="2"
           >
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M19 9l-7 7-7-7"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
           </svg>
         </div>
 
-        <!-- Inline Poll Voting -->
         <transition
             enter-active-class="transition ease-out duration-200"
             enter-from-class="opacity-0 transform -translate-y-2"
@@ -82,11 +100,10 @@ const togglePoll = (id) => {
     </ul>
 
     <p
-        v-if="!loading && polls.length === 0"
+        v-if="!loading && localPolls.length === 0"
         class="text-sm text-gray-500 text-center mt-6"
     >
       No polls found. Create one above!
     </p>
-
   </div>
 </template>
