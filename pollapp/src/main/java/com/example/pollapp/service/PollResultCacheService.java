@@ -14,11 +14,16 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PollResultCacheService {
 
-    private final JedisPooled jedis;
     private static final int TTL_SECONDS = 600;
+    private final JedisPooled jedis;
 
-    private String zsetKey(Long pollId) { return "poll:%d:opts".formatted(pollId); }
-    private String optKey(Long pollId, Long optionId) { return "poll:%d:opt:%d".formatted(pollId, optionId); }
+    private String zsetKey(Long pollId) {
+        return "poll:%d:opts".formatted(pollId);
+    }
+
+    private String optKey(Long pollId, Long optionId) {
+        return "poll:%d:opt:%d".formatted(pollId, optionId);
+    }
 
     /**
      * Lagrer hele resultatlisten (en entry per option) og setter TTL.
@@ -51,9 +56,7 @@ public class PollResultCacheService {
         jedis.expire(opts, TTL_SECONDS);
     }
 
-    /**
-     * Leser resultatlisten fra cache. Returnerer Optional.empty() ved cache-miss.
-     */
+
     public Optional<List<PollResultDto>> loadResults(Long pollId) {
         String opts = zsetKey(pollId);
 
@@ -91,7 +94,6 @@ public class PollResultCacheService {
     }
 
 
-
     public void evict(Long pollId) {
         String opts = zsetKey(pollId);
         List<String> ids = jedis.zrange(opts, 0, -1);
@@ -104,7 +106,10 @@ public class PollResultCacheService {
     }
 
     private int parseInt(String s) {
-        try { return s == null ? 0 : Integer.parseInt(s); }
-        catch (NumberFormatException e) { return 0; }
+        try {
+            return s == null ? 0 : Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

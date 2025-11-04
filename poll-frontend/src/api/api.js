@@ -40,4 +40,8 @@ export const getVotesByPoll = (pollId) => api.get(`/polls/${pollId}/votes`);
 // If you later expose aggregated results, you can use:
 // export const getPollResults = (pollId) => api.get(`/polls/${pollId}/results`);
 
+export async function deletePoll(id) {
+    return api.delete(`/polls/${id}`);
+}
+
 export default api;

@@ -30,6 +30,14 @@ const routes = [
                 next("/");
             }
         }
+    },
+    {
+        path: "/admin",
+        component: () => import("./pages/AdminPage.vue")
+    },
+    {
+        path: "/my-polls",
+        component: () => import("./pages/MyPolls.vue")
     }
 ];
 
