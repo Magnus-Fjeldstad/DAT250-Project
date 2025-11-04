@@ -41,6 +41,19 @@ const logout = async () => {
           </button>
 
           <button
+              v-if="user?.role === 'ROLE_ADMIN'"
+              @click="router.push('/admin')"
+              class="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md transition"
+          >
+            Admin
+          </button>
+          <button
+              @click="router.push('/my-polls')"
+              class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-md transition"
+          >
+            My Polls
+          </button>
+          <button
               @click="logout"
               class="px-3 py-1.5 text-sm bg-gray-800 hover:bg-black text-white rounded-md transition"
           >
