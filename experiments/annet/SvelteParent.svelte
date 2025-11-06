@@ -1,5 +1,5 @@
 <script>
-  import ex1b from "./ex1b.svelte";
+  import ex1b from "./Ex1b.svelte";
   let activeUserId = null;
 </script>
 

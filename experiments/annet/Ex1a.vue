@@ -5,7 +5,7 @@ const users = ref([
   { id: 1, name: "Hanna" },
   { id: 2, name: "Johannes" },
   { id: 3, name: "Thone" },
-  { id: 4, name: "Magnus" }
+  { id: 4, name: "Magnus" },
 ]);
 
 const emit = defineEmits<{
