@@ -60,12 +60,23 @@ const register = async () => {
 
           <div class="space-y-4">
             <div class="input-group">
-              <input v-model="loginUsername" required class="input" placeholder=" " />
+              <input
+                  v-model="loginUsername"
+                  required
+                  class="input"
+                  placeholder=" "
+              />
               <label>Username</label>
             </div>
 
             <div class="input-group">
-              <input v-model="loginPassword" type="password" required class="input" placeholder=" " />
+              <input
+                  v-model="loginPassword"
+                  type="password"
+                  required
+                  class="input"
+                  placeholder=" "
+              />
               <label>Password</label>
             </div>
           </div>
@@ -76,12 +87,16 @@ const register = async () => {
             {{ loginError }}
           </div>
 
+          <button type="button" class="link-btn" @click="showRegister = true">
+            Create an account
+          </button>
+
           <button
               type="button"
-              class="text-sm text-blue-600 hover:text-blue-700 font-medium w-full mt-2"
-              @click="showRegister = true"
+              class="link-btn mt-1"
+              @click="router.push('/public')"
           >
-            Create an account
+            Continue as guest
           </button>
         </form>
 
@@ -97,17 +112,33 @@ const register = async () => {
 
           <div class="space-y-4">
             <div class="input-group">
-              <input v-model="registerUsername" required class="input" placeholder=" " />
+              <input
+                  v-model="registerUsername"
+                  required
+                  class="input"
+                  placeholder=" "
+              />
               <label>Username</label>
             </div>
 
             <div class="input-group">
-              <input v-model="registerEmail" required class="input" placeholder=" " />
+              <input
+                  v-model="registerEmail"
+                  required
+                  class="input"
+                  placeholder=" "
+              />
               <label>Email</label>
             </div>
 
             <div class="input-group">
-              <input v-model="registerPassword" required type="password" class="input" placeholder=" " />
+              <input
+                  v-model="registerPassword"
+                  required
+                  type="password"
+                  class="input"
+                  placeholder=" "
+              />
               <label>Password</label>
             </div>
           </div>
@@ -120,7 +151,7 @@ const register = async () => {
 
           <button
               type="button"
-              class="text-sm text-blue-600 hover:text-blue-700 font-medium w-full mt-2"
+              class="link-btn"
               @click="showRegister = false"
           >
             Back to login
@@ -207,5 +238,21 @@ const register = async () => {
 }
 .btn-green:hover {
   background: #11863c;
+}
+
+.link-btn {
+  width: 100%;
+  text-align: center;
+  font-size: .875rem;
+  font-weight: 500;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+}
+.link-btn:hover {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.08);
 }
 </style>
