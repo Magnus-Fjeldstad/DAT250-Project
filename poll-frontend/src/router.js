@@ -62,7 +62,7 @@ const routes = [
     {
         path: "/public",
         name: "public",
-        component: () => import("./pages/Fallback.vue")
+        component: () => import("./pages/FallBack.vue")
     }
 ];
 
