@@ -1,8 +1,8 @@
 on:
   push:
-    branches: [ "ci" ]
+    branches: [ "CI-letsgo" ]
   pull_request:
-    branches: [ "ci" ]
+    branches: [ "CI-letsgo" ]
 
 jobs:
   build:
