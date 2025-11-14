@@ -3,8 +3,8 @@
     <h1>Vue: Stress + Rerender tester</h1>
 
     <section>
-        <h2>Stress test (10k)</h2>
-        <TheWelcome />
+      <h2>Stress test (10k)</h2>
+      <Stress2 />
     </section>
 
     <!-- <section>
@@ -21,6 +21,6 @@
 
 <script setup>
 import StressTest from "./components/StressTest.vue";
-import TheWelcome from "./components/TheWelcome.vue";
+import Stress2 from "./components/Stress2.vue";
 import RerenderTest from "./components/RerenderTest.vue";
 </script>

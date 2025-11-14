@@ -7,13 +7,11 @@
   let items = [];
 
   onMount(async () => {
-    // Page load timing
     const startLoad = performance.now();
     await new Promise(requestAnimationFrame);
     const pageLoadTime = performance.now() - startLoad;
     saveResult(framework, "page_load", pageLoadTime);
 
-    // Render 10k items timing
     const startRender = performance.now();
     items = Array.from({ length: 10000 }, (_, i) => `Item ${i}`);
     await new Promise(requestAnimationFrame);

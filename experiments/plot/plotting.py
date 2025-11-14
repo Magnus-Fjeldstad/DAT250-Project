@@ -1,7 +1,7 @@
 import json
 import matplotlib.pyplot as plt
 
-with open("results.json", "r") as f:
+with open("results1.json", "r") as f:
     data = json.load(f)
 
 svelte_page = [d["time"] for d in data if d["framework"] == "Svelte" and d["type"] == "page_load"]
