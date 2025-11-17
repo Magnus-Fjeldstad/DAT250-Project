@@ -32,13 +32,12 @@ services:
       - "8080:8080"
     restart: always
 
-#  frontend:
-#    build:
-#      context: .
-#      dockerfile: frontend.Dockerfile # nginx Vue bundle
-#    container_name: poll-frontend
-#    ports:
-#      - "80:80"
-#    depends_on:
-#      - pollapp
-#    restart: always
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - pollapp
+    restart: always
