@@ -1,13 +1,11 @@
-version: "3.9"
-
 services:
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"      # AMQP
-      - "15672:15672"    # Web UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -19,6 +17,17 @@ services:
       - "6379:6379"
     restart: always
 
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecret
+      POSTGRES_DB: pollapp
+    ports:
+      - "5432:5432"
+    restart: always
+
   pollapp:
     build:
       context: .
@@ -26,8 +35,13 @@ services:
     container_name: pollapp
     depends_on:
       - redis
+      - rabbitmq
+      - postgres
     environment:
-      - APP_REDIS_URL=redis://redis:6379
+      APP_REDIS_URL: redis://redis:6379
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/pollapp
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: mysecret
     ports:
       - "8080:8080"
     restart: always
@@ -36,8 +50,22 @@ services:
     build:
       context: .
       dockerfile: frontend.Dockerfile
-    ports:
-      - "80:80"
+    container_name: frontend
     depends_on:
       - pollapp
+    ports:
+      - "80:80"
     restart: always
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: secret
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: always
+
