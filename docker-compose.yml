@@ -1,13 +1,11 @@
-version: "3.9"
-
 services:
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"      # AMQP
-      - "15672:15672"    # Web UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -30,6 +28,8 @@ services:
       - APP_REDIS_URL=redis://redis:6379
     ports:
       - "8080:8080"
+    volumes:
+      - h2data:/data
     restart: always
 
   frontend:
@@ -41,3 +41,6 @@ services:
     depends_on:
       - pollapp
     restart: always
+
+volumes:
+  h2data:
